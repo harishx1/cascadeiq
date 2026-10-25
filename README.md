@@ -34,6 +34,36 @@ python verify.py
 
 ---
 
+## Deploy to Render
+
+**Option A - Blueprint (recommended).** `render.yaml` ships with the repo:
+
+1. Render dashboard -> **New + -> Blueprint -> Connect a repository**
+2. Select `harishx1/cascadeiq`
+3. Render reads `render.yaml` (name, build command, start command, `/health` check) -> **Apply**
+
+**Option B - Manual web service.**
+
+1. Render dashboard -> **New + -> Web Service -> Connect a repository** -> select `harishx1/cascadeiq`
+2. Fill in:
+   - **Runtime**: Python
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Health Check Path**: `/health`
+3. **Create Web Service** and wait for the first deploy.
+
+Nothing else needs changing: the server already binds `0.0.0.0` and reads Render's `$PORT`,
+and `/health` is a plain liveness endpoint.
+
+**Notes**
+
+- The live stream uses WebSockets; they work on the Render free plan.
+- The free plan sleeps after ~15 min without traffic. The first load after a cold start
+  takes roughly 30-50 s, after which everything is live again.
+- If the build rejects the interpreter version, add an env var `PYTHON_VERSION` = `3.13.9`.
+
+---
+
 ## The 60-second demo
 
 1. **Inject** — pick a service, pick a failure mode, set severity, hit `⚡ Inject failure`.
