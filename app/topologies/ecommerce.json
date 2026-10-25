@@ -1,0 +1,69 @@
+{
+  "name": "E-commerce Microservices",
+  "description": "22-service retail platform: edge, API gateway, auth, cart, catalogue, payments, order workers and their data tier.",
+  "meta": {
+    "tags": ["microservices", "retail", "kubernetes"],
+    "stack_hint": "Go + Java services, PostgreSQL, Redis, Kafka"
+  },
+  "nodes": [
+    {"id": "cdn", "label": "CDN Edge", "kind": "external", "description": "Static assets + TLS termination"},
+    {"id": "gateway", "label": "API Gateway", "kind": "gateway", "description": "Routing, rate limiting, auth check"},
+    {"id": "auth", "label": "Auth Service", "kind": "service", "description": "JWT issuance + session validation"},
+    {"id": "product", "label": "Product Service", "kind": "service", "description": "Catalogue read/write API"},
+    {"id": "cart", "label": "Cart Service", "kind": "service", "description": "Shopping cart lifecycle"},
+    {"id": "inventory", "label": "Inventory Service", "kind": "service", "description": "Stock levels + reservations"},
+    {"id": "payment", "label": "Payment Service", "kind": "service", "description": "Charge authorisation + capture"},
+    {"id": "order", "label": "Order Worker", "kind": "function", "description": "Async order finalisation"},
+    {"id": "notify", "label": "Notify Service", "kind": "function", "description": "Email / push dispatch"},
+    {"id": "fraud", "label": "Fraud Scoring", "kind": "ml", "description": "Real-time risk model"},
+    {"id": "identity", "label": "Identity Provider", "kind": "external", "description": "Third-party OAuth provider"},
+
+    {"id": "userdb", "label": "User DB", "kind": "database", "description": "PostgreSQL — accounts"},
+    {"id": "catalogdb", "label": "Catalog DB", "kind": "database", "description": "PostgreSQL — products"},
+    {"id": "cartdb", "label": "Cart DB", "kind": "database", "description": "PostgreSQL — carts"},
+    {"id": "ledgerdb", "label": "Ledger DB", "kind": "database", "description": "PostgreSQL — transactions"},
+    {"id": "stockdb", "label": "Stock DB", "kind": "database", "description": "PostgreSQL — inventory"},
+    {"id": "orderdb", "label": "Order DB", "kind": "database", "description": "PostgreSQL — orders"},
+
+    {"id": "session", "label": "Session Cache", "kind": "cache", "description": "Redis — session tokens"},
+    {"id": "catalogcache", "label": "Catalog Cache", "kind": "cache", "description": "Redis — product reads"},
+    {"id": "orderq", "label": "Order Queue", "kind": "queue", "description": "Kafka — order events"},
+    {"id": "notifyq", "label": "Notify Queue", "kind": "queue", "description": "Kafka — outbound messages"},
+    {"id": "paygw", "label": "Payment Provider", "kind": "external", "description": "Third-party PSP"},
+    {"id": "email", "label": "Email Provider", "kind": "external", "description": "Transactional email SaaS"}
+  ],
+  "edges": [
+    {"source": "cdn", "target": "gateway", "kind": "sync"},
+    {"source": "gateway", "target": "auth", "kind": "sync"},
+    {"source": "gateway", "target": "product", "kind": "sync"},
+    {"source": "gateway", "target": "cart", "kind": "sync"},
+    {"source": "gateway", "target": "payment", "kind": "sync"},
+
+    {"source": "auth", "target": "userdb", "kind": "db"},
+    {"source": "auth", "target": "session", "kind": "cache"},
+    {"source": "auth", "target": "identity", "kind": "sync"},
+
+    {"source": "product", "target": "catalogdb", "kind": "db"},
+    {"source": "product", "target": "catalogcache", "kind": "cache"},
+
+    {"source": "cart", "target": "cartdb", "kind": "db"},
+    {"source": "cart", "target": "product", "kind": "sync"},
+    {"source": "cart", "target": "inventory", "kind": "sync"},
+    {"source": "cart", "target": "catalogcache", "kind": "cache"},
+
+    {"source": "inventory", "target": "stockdb", "kind": "db"},
+    {"source": "inventory", "target": "orderq", "kind": "async"},
+
+    {"source": "payment", "target": "paygw", "kind": "sync"},
+    {"source": "payment", "target": "ledgerdb", "kind": "db"},
+    {"source": "payment", "target": "fraud", "kind": "sync"},
+    {"source": "payment", "target": "orderq", "kind": "async"},
+
+    {"source": "order", "target": "orderq", "kind": "async"},
+    {"source": "order", "target": "orderdb", "kind": "db"},
+    {"source": "order", "target": "notifyq", "kind": "async"},
+
+    {"source": "notify", "target": "notifyq", "kind": "async"},
+    {"source": "notify", "target": "email", "kind": "sync"}
+  ]
+}

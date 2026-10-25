@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local tooling (not part of the project)
+.agents/
+skills-lock.json
+
+# Hackathon brief (kept out of the public repo)
+problem.pdf

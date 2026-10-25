@@ -1,0 +1,10 @@
+{
+  "name": "Blank Canvas",
+  "description": "An empty graph. Build your own architecture node by node and watch the engine predict a cascade it has never seen before.",
+  "meta": {
+    "tags": ["custom", "empty"],
+    "stack_hint": "yours"
+  },
+  "nodes": [],
+  "edges": []
+}

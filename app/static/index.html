@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en" color-scheme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070a10">
+<title>CascadeIQ — Cascading Failure Prediction Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f17'/%3E%3Cpath d='M9 22 16 9 23 22' fill='none' stroke='%2338bdf8' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='22' r='3.4' fill='%232ee6a8'/%3E%3Ccircle cx='16' cy='9' r='3.4' fill='%238b5cf6'/%3E%3Ccircle cx='23' cy='22' r='3.4' fill='%23ff3d71'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#graphRegion">Skip to dependency graph</a>
+
+<div class="app">
+
+  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="6" r="2.4"/>
+          <circle cx="12" cy="18" r="2.4"/>
+          <path d="M7.4 6h9.2M6.6 7.9 10.5 16M17.4 7.9 13.5 16"/>
+        </svg>
+      </span>
+      <span class="brand-text">Cascade<span class="brand-accent">IQ</span></span>
+      <span class="brand-sub">failure prediction console</span>
+    </div>
+
+    <div class="topbar-mid">
+      <span class="pill pill-time" title="Simulated elapsed time">
+        <span class="pill-k">t</span><span id="simClock" class="mono">00:00.0</span>
+      </span>
+      <button id="btnPlay" class="icon-btn" type="button" aria-label="Pause simulation" aria-pressed="true">
+        <svg class="i-pause" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"
+             fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/>
+             <rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        <svg class="i-play" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"
+             fill="currentColor" hidden><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+      <label class="sr-only" for="speedSel">Playback speed</label>
+      <select id="speedSel" class="mini-select">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+
+      <div class="health-pills" id="healthPills" role="status" aria-live="polite" aria-label="Fleet health">
+        <span class="hp hp-healthy" title="Healthy"><i aria-hidden="true"></i><b id="hpHealthy">0</b></span>
+        <span class="hp hp-degraded" title="Degraded"><i aria-hidden="true"></i><b id="hpDegraded">0</b></span>
+        <span class="hp hp-failing" title="Failing"><i aria-hidden="true"></i><b id="hpFailing">0</b></span>
+        <span class="hp hp-down" title="Down"><i aria-hidden="true"></i><b id="hpDown">0</b></span>
+      </div>
+
+      <span class="pill" title="Fleet availability"><span class="pill-k">avail</span>
+        <span id="uptimeVal" class="mono">100.0%</span></span>
+      <span class="pill" title="Peak blast radius"><span class="pill-k">peak</span>
+        <span id="peakVal" class="mono">0</span></span>
+    </div>
+
+    <div class="topbar-right">
+      <span id="connState" class="conn conn-on" role="status" aria-live="polite">
+        <i aria-hidden="true"></i><span>live</span>
+      </span>
+      <button id="btnChaos" class="btn btn-ghost" type="button" aria-pressed="false">
+        <span aria-hidden="true">☢</span> Chaos
+      </button>
+      <button id="btnReset" class="btn btn-ghost" type="button">Reset</button>
+      <button id="btnReportTop" class="btn btn-primary" type="button">Incident report</button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════ WORKSPACE ══════════════════════════ -->
+  <div class="workspace">
+
+    <!-- ─────────── LEFT RAIL ─────────── -->
+    <aside class="rail rail-left" aria-label="Simulation controls">
+
+      <section class="card">
+        <h2 class="card-h">Fault injection</h2>
+
+        <div class="field">
+          <label for="targetNode">Target service</label>
+          <select id="targetNode"></select>
+        </div>
+
+        <div class="field">
+          <label for="pFaultType">Failure mode</label>
+          <select id="pFaultType"></select>
+          <p id="faultHint" class="hint">—</p>
+        </div>
+
+        <div class="field">
+          <label for="pSeverity">Severity <span class="unit"><output id="pSeverityOut" class="mono">5</output>/10</span></label>
+          <input id="pSeverity" type="range" min="1" max="10" step="1" value="5">
+        </div>
+
+        <div class="btn-row">
+          <button id="btnInject" class="btn btn-danger" type="button">⚡ Inject failure</button>
+          <button id="btnClear" class="btn btn-ghost" type="button">Clear</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Environment parameters</h2>
+
+        <div class="field">
+          <label for="pTraffic">Traffic load <span class="unit"><output id="pTrafficOut" class="mono">55</output>%</span></label>
+          <input id="pTraffic" type="range" min="0" max="100" step="1" value="55">
+        </div>
+
+        <div class="field">
+          <label for="pCascade">Cascade speed <span class="unit"><output id="pCascadeOut" class="mono">1.0</output>×</span></label>
+          <input id="pCascade" type="range" min="0.25" max="4" step="0.25" value="1">
+        </div>
+
+        <div class="field">
+          <label for="pTimeout">Timeout budget <span class="unit"><output id="pTimeoutOut" class="mono">800</output>&nbsp;ms</span></label>
+          <input id="pTimeout" type="range" min="100" max="3000" step="50" value="800">
+        </div>
+
+        <div class="field">
+          <label for="pRetries">Retry aggression <span class="unit"><output id="pRetriesOut" class="mono">1.5</output>×</span></label>
+          <input id="pRetries" type="range" min="0" max="5" step="0.5" value="1.5">
+          <p class="hint">High retries amplify load on a struggling dependency — the classic retry storm.</p>
+        </div>
+
+        <div class="switch-row">
+          <label class="switch" for="pBreaker">
+            <input id="pBreaker" type="checkbox">
+            <span aria-hidden="true"></span>
+            <span class="switch-label">Circuit breaker</span>
+          </label>
+          <label class="switch" for="pRateLimit">
+            <input id="pRateLimit" type="checkbox">
+            <span aria-hidden="true"></span>
+            <span class="switch-label">Rate limiting</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h">Architecture presets</h2>
+        <div class="preset-row">
+          <label class="sr-only" for="topoPreset">Load topology</label>
+          <select id="topoPreset"></select>
+          <button id="btnLoadTopo" class="btn btn-soft" type="button">Load</button>
+          <button id="btnGoEditor" class="btn btn-ghost" type="button">Edit</button>
+        </div>
+        <p id="topoMeta" class="hint">—</p>
+      </section>
+    </aside>
+
+    <!-- ─────────── CENTER ─────────── -->
+    <main class="center" id="graphRegion">
+      <div class="graph-wrap">
+        <canvas id="graph" tabindex="0" role="img"
+                aria-label="Live service dependency graph. Nodes are coloured by health: green healthy, amber degraded, red failing, magenta down."></canvas>
+
+        <div class="graph-hud hud-tl">
+          <span class="hud-title" id="gTopoName">—</span>
+          <span class="hud-sub" id="gTopoSub">—</span>
+        </div>
+
+        <div class="graph-hud hud-tr">
+          <button id="btnRelayout" class="btn btn-mini" type="button">Relayout</button>
+        </div>
+
+        <ul class="legend" aria-label="Graph legend">
+          <li><i class="dot d-healthy"></i>healthy</li>
+          <li><i class="dot d-degraded"></i>degraded</li>
+          <li><i class="dot d-failing"></i>failing</li>
+          <li><i class="dot d-down"></i>down</li>
+          <li><i class="dot d-root"></i>root cause</li>
+          <li><i class="dot d-pred"></i>predicted</li>
+        </ul>
+
+        <div id="graphTip" class="gtip" role="tooltip" hidden></div>
+
+        <div id="scrubBadge" class="scrub-badge" hidden>
+          <span>Reviewing history</span>
+          <button id="btnBackLive" class="btn btn-mini" type="button">Return to live</button>
+        </div>
+      </div>
+
+      <!-- ─────────── TIMELINE ─────────── -->
+      <section class="timeline" aria-label="Simulation timeline">
+        <div class="tl-controls">
+          <button id="btnStepBack" class="icon-btn" type="button" aria-label="Step back 5 seconds">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor">
+              <path d="M17 6v12L9 12zM7 6h2v12H7z"/></svg>
+          </button>
+          <button id="btnStepFwd" class="icon-btn" type="button" aria-label="Step forward 5 seconds">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor">
+              <path d="M7 6v12l8-6zM15 6h2v12h-2z"/></svg>
+          </button>
+          <span class="tl-clock mono" id="tlClock">00:00.0</span>
+          <label class="sr-only" for="scrub">Timeline scrubber</label>
+          <input id="scrub" type="range" min="0" max="0" step="1" value="0"
+                 aria-describedby="tlHint">
+          <span class="tl-clock mono" id="tlEnd">00:00.0</span>
+          <button id="btnLive" class="btn btn-mini" type="button" aria-pressed="true">● Live</button>
+        </div>
+        <div class="tl-markers" id="tlMarkers" aria-hidden="true"></div>
+        <p id="tlHint" class="sr-only">Drag to review earlier points in the simulation. Event markers are drawn above the track.</p>
+      </section>
+    </main>
+
+    <!-- ─────────── RIGHT RAIL ─────────── -->
+    <aside class="rail rail-right" aria-label="Prediction and recovery">
+
+      <section class="card card-accent">
+        <h2 class="card-h">
+          <span aria-hidden="true">◉</span> Root cause
+          <span id="rcBadge" class="badge badge-idle">waiting</span>
+        </h2>
+        <div id="rootCause" class="rc-body">
+          <p class="empty">No anomalies detected. Inject a failure to begin analysis.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h"><span aria-hidden="true">⌁</span> Cascade path</h2>
+        <div id="cascadePath" class="path">
+          <p class="empty">—</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h"><span aria-hidden="true">⚠</span> Predicted next failures</h2>
+        <div id="nextFailures"><p class="empty">—</p></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-h"><span aria-hidden="true">⛑</span> Recovery strategies</h2>
+        <p id="rationale" class="rationale">Awaiting an incident.</p>
+        <div id="recoveryList" class="rec-list"></div>
+        <ul id="decisionFactors" class="factors"></ul>
+      </section>
+    </aside>
+  </div>
+
+  <!-- ══════════════════════════ DOCK ══════════════════════════ -->
+  <section class="dock" aria-label="Analysis dock">
+    <div class="dock-tabs" role="tablist" aria-label="Dock panels">
+      <button class="tab is-active" id="tab-logs" role="tab" aria-selected="true"
+              aria-controls="panel-logs" type="button">Live logs</button>
+      <button class="tab" id="tab-whatif" role="tab" aria-selected="false"
+              aria-controls="panel-whatif" type="button">What-if compare</button>
+      <button class="tab" id="tab-topology" role="tab" aria-selected="false"
+              aria-controls="panel-topology" type="button">Topology studio</button>
+      <button class="tab" id="tab-report" role="tab" aria-selected="false"
+              aria-controls="panel-report" type="button">Incident report</button>
+      <button class="tab" id="tab-arch" role="tab" aria-selected="false"
+              aria-controls="panel-arch" type="button">Architecture</button>
+      <span class="dock-spacer"></span>
+      <span class="dock-stat mono" id="dockStat">—</span>
+    </div>
+
+    <!-- Live logs -->
+    <div class="dock-panel is-active" id="panel-logs" role="tabpanel"
+         aria-labelledby="tab-logs" tabindex="0">
+      <div class="log-bar">
+        <label class="sr-only" for="logLevel">Minimum log level</label>
+        <select id="logLevel" class="mini-select">
+          <option value="INFO">INFO+</option>
+          <option value="WARN" selected>WARN+</option>
+          <option value="ERROR">ERROR+</option>
+          <option value="FATAL">FATAL</option>
+        </select>
+        <label class="sr-only" for="logSearch">Filter logs</label>
+        <input id="logSearch" class="mini-input" type="search" placeholder="filter service or text…"
+               autocomplete="off" spellcheck="false">
+        <label class="chk"><input id="logFollow" type="checkbox" checked> follow</label>
+        <span class="log-count mono" id="logCount">0 lines</span>
+      </div>
+      <div class="log-stream" id="logStream" role="log" aria-live="off" aria-label="Live log stream"></div>
+    </div>
+
+    <!-- What-if -->
+    <div class="dock-panel" id="panel-whatif" role="tabpanel"
+         aria-labelledby="tab-whatif" tabindex="0">
+      <div class="wi-grid">
+        <div class="wi-col">
+          <h3>Variant A</h3>
+          <label class="sr-only" for="variantA">Variant A configuration</label>
+          <select id="variantA" class="mini-select"></select>
+        </div>
+        <div class="wi-col">
+          <h3>Variant B</h3>
+          <label class="sr-only" for="variantB">Variant B configuration</label>
+          <select id="variantB" class="mini-select"></select>
+        </div>
+        <div class="wi-col">
+          <h3>Target service</h3>
+          <label class="sr-only" for="wiNode">Fault target node</label>
+          <select id="wiNode" class="mini-select"></select>
+        </div>
+        <div class="wi-col">
+          <h3>Fault type</h3>
+          <label class="sr-only" for="wiType">Fault type</label>
+          <select id="wiType" class="mini-select"></select>
+        </div>
+        <div class="wi-col wi-run">
+          <button id="btnRunScenario" class="btn btn-primary" type="button">Run comparison</button>
+          <span id="wiStatus" class="hint" role="status" aria-live="polite">Runs both variants head-to-head.</span>
+        </div>
+      </div>
+      <div id="wiResult" class="wi-result"><p class="empty">No comparison run yet.</p></div>
+    </div>
+
+    <!-- Topology studio -->
+    <div class="dock-panel" id="panel-topology" role="tabpanel"
+         aria-labelledby="tab-topology" tabindex="0">
+      <div class="ts-grid">
+        <div class="ts-col">
+          <h3>Add a service</h3>
+          <form id="nodeForm" class="ts-form">
+            <label class="sr-only" for="nId">Service id</label>
+            <input id="nId" class="mini-input" name="id" placeholder="id  e.g. billing"
+                   autocomplete="off" spellcheck="false" required>
+            <label class="sr-only" for="nLabel">Display label</label>
+            <input id="nLabel" class="mini-input" name="label" placeholder="label  e.g. Billing Service"
+                   autocomplete="off" required>
+            <label class="sr-only" for="nKind">Service kind</label>
+            <select id="nKind" class="mini-select"></select>
+            <button class="btn btn-soft" type="submit">Add node</button>
+          </form>
+
+          <h3>Connect two services</h3>
+          <form id="edgeForm" class="ts-form">
+            <label class="sr-only" for="eFrom">Source service</label>
+            <select id="eFrom" class="mini-select"></select>
+            <span class="ts-arrow" aria-hidden="true">→</span>
+            <label class="sr-only" for="eTo">Target service</label>
+            <select id="eTo" class="mini-select"></select>
+            <label class="sr-only" for="eKind">Dependency type</label>
+            <select id="eKind" class="mini-select">
+              <option value="sync">sync (HTTP/gRPC)</option>
+              <option value="db">database</option>
+              <option value="cache">cache</option>
+              <option value="async">async (queue)</option>
+              <option value="stream">stream</option>
+            </select>
+            <button class="btn btn-soft" type="submit">Add edge</button>
+          </form>
+        </div>
+
+        <div class="ts-col">
+          <h3>Current services <span id="tsCount" class="ts-count mono"></span></h3>
+          <ul id="nodeList" class="ts-nodes"></ul>
+        </div>
+
+        <div class="ts-col ts-json">
+          <h3>Import / export JSON</h3>
+          <label class="sr-only" for="jsonBox">Topology JSON</label>
+          <textarea id="jsonBox" spellcheck="false" autocomplete="off"
+                    placeholder='Paste any topology: {"name":"…","nodes":[…],"edges":[…]}'></textarea>
+          <div class="btn-row">
+            <button id="btnValidate" class="btn btn-ghost" type="button">Validate</button>
+            <button id="btnApplyJson" class="btn btn-soft" type="button">Apply</button>
+            <button id="btnExport" class="btn btn-ghost" type="button">Export current</button>
+          </div>
+          <p id="jsonMsg" class="hint" role="status" aria-live="polite">—</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incident report -->
+    <div class="dock-panel" id="panel-report" role="tabpanel"
+         aria-labelledby="tab-report" tabindex="0">
+      <div class="rep-bar">
+        <button id="btnGenReport" class="btn btn-primary" type="button">Generate report</button>
+        <button id="btnDlReport" class="btn btn-ghost" type="button" disabled>Download HTML</button>
+        <span id="repStatus" class="hint" role="status" aria-live="polite"></span>
+      </div>
+      <div id="repOut" class="rep-out"><p class="empty">Generate a report to see the incident write-up.</p></div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="dock-panel" id="panel-arch" role="tabpanel"
+         aria-labelledby="tab-arch" tabindex="0">
+      <div class="arch">
+        <div class="arch-col">
+          <h3>Why this is not a static demo</h3>
+          <p>The prediction engine has no idea what your services do. It receives a
+             directed graph of nodes and edges plus six universally observable
+             signals — latency, error rate, throughput, CPU, memory, queue depth —
+             and nothing else. Add a node, delete a node, import a topology from
+             JSON: the same code path runs, unchanged.</p>
+          <p>Failure modes are protocol-level, not application-level: a broken
+             dependency, a saturated resource, a lapsed credential. Those exist in
+             every stack regardless of language or framework.</p>
+        </div>
+        <div class="arch-col">
+          <h3>How it scales</h3>
+          <ul>
+            <li>Graph algorithms are O(V+E); a 300-node mesh runs in ~14&nbsp;ms per tick.</li>
+            <li>Simulation is event-driven with an heapq schedule, not a fixed grid.</li>
+            <li>Log ingestion and prediction are separate passes over an interface —
+                in production the generator is swapped for a real log pipeline
+                (Loki / Elasticsearch) with no change downstream.</li>
+            <li>State broadcast is delta-encoded, so bandwidth is independent of log volume.</li>
+          </ul>
+        </div>
+        <div class="arch-col">
+          <h3>Model stack</h3>
+          <ol>
+            <li><b>Propagation model</b> — dependency-weighted pressure with a
+                dead-dependency tipping point and protocol-specific damping.</li>
+            <li><b>Root-cause isolation</b> — first-anomaly onset ranking combined
+                with reachability over the failure-direction subgraph.</li>
+            <li><b>Forecast</b> — per-node risk aggregation with breaker / rate-limit
+                corrections, mapped to a failure probability and ETA.</li>
+            <li><b>Recovery ranking</b> — strategy × fault-class × node-role match
+                scored against success, risk, blast radius and time-to-recover.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

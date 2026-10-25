@@ -1,0 +1,43 @@
+{
+  "name": "Realtime Chat",
+  "description": "WebSocket chat platform with presence, media uploads and fan-out to push notification workers.",
+  "meta": {
+    "tags": ["websocket", "realtime", "event-driven"],
+    "stack_hint": "Node.js + Go, Redis, Cassandra, S3"
+  },
+  "nodes": [
+    {"id": "wsclient", "label": "Client Pool", "kind": "external", "description": "Connected websocket clients"},
+    {"id": "wsgw", "label": "WS Gateway", "kind": "gateway", "description": "Connection admission + heartbeats"},
+    {"id": "hub", "label": "Realtime Hub", "kind": "service", "description": "Room routing + fan-out"},
+    {"id": "msgsvc", "label": "Message Service", "kind": "service", "description": "Persist + ordered delivery"},
+    {"id": "presence", "label": "Presence Service", "kind": "service", "description": "Online / typing state"},
+    {"id": "media", "label": "Media Service", "kind": "service", "description": "Image + video ingest"},
+    {"id": "push", "label": "Push Worker", "kind": "function", "description": "APNs / FCM delivery"},
+
+    {"id": "msgdb", "label": "Message Store", "kind": "database", "description": "Cassandra — chat history"},
+    {"id": "metadb", "label": "Metadata DB", "kind": "database", "description": "PostgreSQL — rooms + members"},
+    {"id": "prescache", "label": "Presence Cache", "kind": "cache", "description": "Redis — online sets"},
+    {"id": "msgbus", "label": "Message Bus", "kind": "stream", "description": "Kafka — ordered per room"},
+    {"id": "blobstore", "label": "Object Store", "kind": "storage", "description": "S3 — attachments"},
+    {"id": "pushq", "label": "Push Queue", "kind": "queue", "description": "RabbitMQ — offline delivery"}
+  ],
+  "edges": [
+    {"source": "wsclient", "target": "wsgw", "kind": "sync"},
+    {"source": "wsgw", "target": "hub", "kind": "sync"},
+    {"source": "hub", "target": "msgsvc", "kind": "sync"},
+    {"source": "hub", "target": "presence", "kind": "sync"},
+
+    {"source": "msgsvc", "target": "msgdb", "kind": "db"},
+    {"source": "msgsvc", "target": "msgbus", "kind": "stream"},
+    {"source": "msgsvc", "target": "metadb", "kind": "db"},
+
+    {"source": "presence", "target": "prescache", "kind": "cache"},
+    {"source": "hub", "target": "prescache", "kind": "cache"},
+
+    {"source": "msgbus", "target": "push", "kind": "async"},
+    {"source": "push", "target": "pushq", "kind": "async"},
+
+    {"source": "hub", "target": "media", "kind": "sync"},
+    {"source": "media", "target": "blobstore", "kind": "db"}
+  ]
+}

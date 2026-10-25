@@ -1,0 +1,37 @@
+{
+  "name": "Modular Monolith",
+  "description": "A single deployable with internal modules, a primary/replica database pair and a scheduled job tier — the architecture most teams actually run.",
+  "meta": {
+    "tags": ["monolith", "classic", "vm"],
+    "stack_hint": "Ruby on Rails + Sidekiq, MySQL primary/replica"
+  },
+  "nodes": [
+    {"id": "lb", "label": "Load Balancer", "kind": "gateway", "description": "L7 routing + health checks"},
+    {"id": "app", "label": "App Server", "kind": "service", "description": "Rails monolith — 8 pods"},
+    {"id": "jobs", "label": "Job Worker", "kind": "function", "description": "Sidekiq — background jobs"},
+    {"id": "scheduler", "label": "Scheduler", "kind": "function", "description": "Cron + recurring tasks"},
+
+    {"id": "primary", "label": "Primary DB", "kind": "database", "description": "MySQL — writes"},
+    {"id": "replica", "label": "Read Replica", "kind": "database", "description": "MySQL — reads"},
+    {"id": "pagecache", "label": "Page Cache", "kind": "cache", "description": "Redis — fragment cache"},
+    {"id": "jobq", "label": "Job Queue", "kind": "queue", "description": "Redis — Sidekiq queue"},
+    {"id": "fs", "label": "File Store", "kind": "storage", "description": "NFS — uploads"},
+    {"id": "stripe", "label": "Billing Provider", "kind": "external", "description": "Subscription billing SaaS"}
+  ],
+  "edges": [
+    {"source": "lb", "target": "app", "kind": "sync"},
+    {"source": "app", "target": "primary", "kind": "db"},
+    {"source": "app", "target": "replica", "kind": "db"},
+    {"source": "app", "target": "pagecache", "kind": "cache"},
+    {"source": "app", "target": "jobq", "kind": "async"},
+    {"source": "app", "target": "fs", "kind": "db"},
+    {"source": "app", "target": "stripe", "kind": "sync"},
+
+    {"source": "jobs", "target": "jobq", "kind": "async"},
+    {"source": "jobs", "target": "primary", "kind": "db"},
+    {"source": "jobs", "target": "fs", "kind": "db"},
+
+    {"source": "scheduler", "target": "jobq", "kind": "async"},
+    {"source": "scheduler", "target": "primary", "kind": "db"}
+  ]
+}

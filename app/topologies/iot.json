@@ -1,0 +1,47 @@
+{
+  "name": "IoT Telemetry Pipeline",
+  "description": "Device fleet ingesting telemetry through MQTT into a stream processor, time-series store, anomaly model and alerting tier.",
+  "meta": {
+    "tags": ["iot", "streaming", "batch"],
+    "stack_hint": "Python + Rust, MQTT, TimescaleDB, feature store"
+  },
+  "nodes": [
+    {"id": "fleet", "label": "Device Fleet", "kind": "external", "description": "12k field gateways"},
+    {"id": "ingest", "label": "Ingest Gateway", "kind": "gateway", "description": "MQTT broker front-door"},
+    {"id": "router", "label": "Topic Router", "kind": "service", "description": "Schema check + fan-out"},
+    {"id": "processor", "label": "Stream Processor", "kind": "service", "description": "Windowed aggregation"},
+    {"id": "features", "label": "Feature Pipeline", "kind": "function", "description": "Rolling feature computation"},
+    {"id": "anomaly", "label": "Anomaly Model", "kind": "ml", "description": "Unsupervised drift detection"},
+    {"id": "alerting", "label": "Alerting Engine", "kind": "service", "description": "Threshold + suppression rules"},
+    {"id": "dashboard", "label": "Ops Dashboard", "kind": "service", "description": "Live fleet visualisation"},
+
+    {"id": "tsdb", "label": "Time-Series DB", "kind": "database", "description": "TimescaleDB — telemetry"},
+    {"id": "rawtopic", "label": "Raw Topic", "kind": "stream", "description": "Kafka — raw frames"},
+    {"id": "aggtopic", "label": "Aggregate Topic", "kind": "stream", "description": "Kafka — windows"},
+    {"id": "featurestore", "label": "Feature Store", "kind": "cache", "description": "Redis — model inputs"},
+    {"id": "coldstore", "label": "Cold Storage", "kind": "storage", "description": "Object store — archive"},
+    {"id": "pager", "label": "Paging Service", "kind": "external", "description": "On-call notification SaaS"}
+  ],
+  "edges": [
+    {"source": "fleet", "target": "ingest", "kind": "sync"},
+    {"source": "ingest", "target": "router", "kind": "async"},
+    {"source": "router", "target": "rawtopic", "kind": "stream"},
+    {"source": "router", "target": "tsdb", "kind": "db"},
+
+    {"source": "rawtopic", "target": "processor", "kind": "async"},
+    {"source": "processor", "target": "aggtopic", "kind": "stream"},
+    {"source": "processor", "target": "tsdb", "kind": "db"},
+
+    {"source": "aggtopic", "target": "features", "kind": "async"},
+    {"source": "features", "target": "featurestore", "kind": "cache"},
+    {"source": "features", "target": "coldstore", "kind": "db"},
+
+    {"source": "anomaly", "target": "featurestore", "kind": "cache"},
+    {"source": "alerting", "target": "anomaly", "kind": "sync"},
+    {"source": "aggtopic", "target": "alerting", "kind": "stream"},
+    {"source": "alerting", "target": "pager", "kind": "sync"},
+
+    {"source": "dashboard", "target": "tsdb", "kind": "db"},
+    {"source": "aggtopic", "target": "dashboard", "kind": "stream"}
+  ]
+}
