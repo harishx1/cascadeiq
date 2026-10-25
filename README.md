@@ -55,6 +55,8 @@ python verify.py
 Nothing else needs changing: the server already binds `0.0.0.0` and reads Render's `$PORT`,
 and `/health` is a plain liveness endpoint.
 
+**Live**: https://cascadeiq-vsaq.onrender.com
+
 **Notes**
 
 - The live stream uses WebSockets; they work on the Render free plan.
