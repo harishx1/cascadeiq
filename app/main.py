@@ -66,6 +66,12 @@ class Hub:
                 self.tick += 1
                 if self.tick % 2 == 0:
                     await self.broadcast_state()
+                # the right-hand rail has to track the cascade as it unfolds —
+                # root cause, predicted next failures and the ranked recovery
+                # options all change during a fall, so refresh them on a
+                # cadence instead of only when an operator clicks something
+                if self.clients and self.tick % 20 == 0:
+                    await self.push_analysis()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # keep the loop alive; surface the error
